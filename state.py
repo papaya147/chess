@@ -2,6 +2,8 @@ import chess
 import numpy as np
 import torch
 
+device = 'mps'
+
 def board_to_tensor(board: chess.Board):
     tensor = np.zeros((12, 8, 8), dtype=np.float32)
 
@@ -25,7 +27,7 @@ def board_to_tensor(board: chess.Board):
         elif piece.piece_type == chess.KING:
             tensor[offset + 5, row, col] = 1
 
-    return torch.tensor(tensor)
+    return torch.tensor(tensor, dtype=torch.float32, device=device)
 
 def move_index_mappings():
     move_to_index, index_to_move = {}, {}

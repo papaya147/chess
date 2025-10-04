@@ -6,6 +6,8 @@ import numpy as np
 import chess
 from network import ChessNet
 
+device = 'mps'
+
 class MCTSNode:
     def __init__(self, board, parent=None, priors=0.0, move_idx=None):
         self.board = board.copy()
@@ -20,23 +22,23 @@ class MCTSNode:
     def average_value(self):
         return self.value_sum / self.visits if self.visits > 0 else 0.0
     
-def expand_node(node, net, board, alpha=None, epsilon=None):
+def expand_node(node, net, board, alpha=None, epsilon=None, device=torch.device('mps')):
     state = board_to_tensor(board).unsqueeze(0)
     policy_logits, value = net(state)
     policy_logits = policy_logits.squeeze(0)
     value = value.item()
 
-    mask = torch.tensor(move_mask(board))
+    mask = torch.tensor(move_mask(board), dtype=torch.float32, device=device)
     masked_logits = policy_logits + (mask - 1) * 1e9
-    priors = F.softmax(masked_logits, dim=0).detach().numpy()
+    priors = F.softmax(masked_logits, dim=0).cpu().detach().numpy()
 
     if alpha is not None and epsilon is not None:
-        legal_idxs = np.where(mask.numpy() == 1)[0]
+        legal_idxs = np.where(mask.cpu().numpy() == 1)[0]
         if len(legal_idxs) > 0:
             noise = np.random.dirichlet([alpha] * len(legal_idxs))
             priors[legal_idxs] = (1 - epsilon) * priors[legal_idxs] + epsilon * noise
 
-    for idx in np.where(mask.numpy() == 1)[0]: # add all children nodes (create child wherever legal move exists)
+    for idx in np.where(mask.cpu().numpy() == 1)[0]: # add all children nodes (create child wherever legal move exists)
         move_uci = index_to_move[idx]
         child_board = board.copy()
         child_board.push_uci(move_uci)
@@ -83,7 +85,7 @@ def backpropogate(node, value):
         value = -value # negate for opp in next iter
         current = current.parent
 
-def visit_policy(root, temperature):
+def visit_policy(root, temperature, device=torch.device('mps')):
     visits = np.zeros(len(move_to_index))
     for idx, child in root.children.items():
         visits[idx] = child.visits
@@ -95,7 +97,7 @@ def visit_policy(root, temperature):
         visits = visits ** (1 / temperature)
         probs = visits / visits.sum()
     
-    return torch.tensor(probs)
+    return torch.tensor(probs, dtype=torch.float32, device=device)
     
 def search(net, board, n_sims=400, c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     root = MCTSNode(board)
@@ -116,7 +118,7 @@ def search(net, board, n_sims=400, c_puct=1.5, temperature=1.5, alpha=0.2, epsil
 
     return probs, value
 
-def selfplay(net, replay_buffer, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
+def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     board = chess.Board()
     positions, policies, values = [], [], []
 
@@ -128,8 +130,8 @@ def selfplay(net, replay_buffer, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, 
         board.push_uci(move_uci)
 
         state = board_to_tensor(board)
-        positions.append(state)
-        policies.append(probs.numpy())
+        positions.append(state.cpu())
+        policies.append(probs.cpu().numpy())
         values.append(value)
     
     # final reward
@@ -137,12 +139,11 @@ def selfplay(net, replay_buffer, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, 
     reward = 1 if result == '1-0' else -1 if result == '0-1' else 0
     values = [reward * (-1 if (len(board.move_stack) - i) % 2 == 1 else 1) for i in range(len(values))]  # flip signs for opponent turns in hindsight
 
-    replay_buffer.add_game(positions, policies, values)
-
     return board, positions, policies, values
 
-def selfplay_wrapper(net_path, replay_buffer, num_sims, c_puct, temperature, alpha, epsilon):
+def selfplay_wrapper(net_path, num_sims, c_puct, temperature, alpha, epsilon):
     net = ChessNet(n_moves=len(move_to_index))
     net.load_state_dict(torch.load(net_path))
+    net = net.to(device)
     net.eval()
-    return selfplay(net, replay_buffer, num_sims, c_puct, temperature, alpha, epsilon)
+    return selfplay(net, num_sims, c_puct, temperature, alpha, epsilon)
