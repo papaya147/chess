@@ -5,8 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 import chess
 from network import ChessNet
-
-device = 'mps'
+from device import device
 
 class MCTSNode:
     def __init__(self, board, parent=None, prior=0.0, move_idx=None):

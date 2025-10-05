@@ -3,8 +3,7 @@ import random
 import torch
 import numpy as np
 import pickle
-
-device = 'mps'
+from device import device
 
 class ReplayBuffer:
     def __init__(self, cap, pct_recent=0.1, pct_recent_util=0.8):

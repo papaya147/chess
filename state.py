@@ -1,8 +1,7 @@
 import chess
 import numpy as np
 import torch
-
-device = 'mps'
+from device import device
 
 def board_to_tensor(board: chess.Board):
     tensor = np.zeros((12, 8, 8), dtype=np.float32)
