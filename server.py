@@ -32,17 +32,18 @@ def predict():
         board = chess.Board(fen)
         state = board_to_tensor(board).unsqueeze(0)
 
-        mask = move_mask(board)
+        mask = torch.tensor(move_mask(board), dtype=torch.float32, device=device)
 
         with torch.no_grad():
             policy, value = model(state)
-            policy = policy.cpu()
+            policy = policy
             value = value.cpu().numpy().flatten()[0]
 
         masked_policy = policy + (mask - 1) * 1e9
-        masked_policy = F.softmax(masked_policy)
+        masked_policy = F.softmax(masked_policy, dim=-1)
+        masked_policy = masked_policy[0].cpu().numpy()
 
-        chosen_idx = np.random.choice(range(len(masked_policy[0])), p=masked_policy[0].numpy())
+        chosen_idx = np.random.choice(range(len(masked_policy)), p=masked_policy)
         chosen_move = index_to_move[chosen_idx]
         board.push_uci(chosen_move)
 
