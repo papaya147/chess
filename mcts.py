@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import chess
-from network import ChessNet
+from network import ChessNetV2 as ChessNet
 from device import device
 
 class MCTSNode:

@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import torch
 import torch.nn.functional as F
-from network import ChessNet
+from network import ChessNetV1 as ChessNet
 from state import move_to_index, index_to_move, board_to_tensor, move_mask
 import chess
 from device import device
