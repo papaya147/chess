@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import torch
 import torch.nn.functional as F
 from network import ChessNet
@@ -8,6 +9,7 @@ from device import device
 import numpy as np
 
 app = Flask(__name__)
+CORS(app, resources={r"/predict": {"origins": "*"}})
 
 n_moves = len(move_to_index)
 model_path = 'eval model.pth'
