@@ -8,7 +8,7 @@ The Chess Bot uses advanced reinforcement learning techniques to play chess. Her
 -   **Monte Carlo Tree Search (MCTS)**: Guides the bot's decision-making by simulating thousands of possible game outcomes, balancing exploration and exploitation.
 -   **Replay Buffer**: Stores game experiences (states, actions, rewards) for training, allowing the bot to learn and improve over time.
 
-Training is very resource and time-intensive, but the notebook [`train.ipynb`](https://github.com/papaya147/chess-bot/blob/main/train.ipynb) can be modified to train your own bot!
+Training is very resource and time-intensive, but the notebook [`train.ipynb`](https://github.com/papaya147/chess-bot/blob/main/train.ipynb) can be modified to train your own bot.
 
 ## Playing Against the Bot
 Playing the Chess Bot is easy and requires only a web browser. Follow these steps to get started:
