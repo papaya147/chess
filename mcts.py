@@ -9,10 +9,10 @@ from network import ChessNet
 device = 'mps'
 
 class MCTSNode:
-    def __init__(self, board, parent=None, priors=0.0, move_idx=None):
+    def __init__(self, board, parent=None, prior=0.0, move_idx=None):
         self.board = board.copy()
         self.parent = parent
-        self.priors = priors
+        self.prior = prior
         self.move_idx = move_idx
         self.children = {}
         self.visits = 0
@@ -22,33 +22,52 @@ class MCTSNode:
     def average_value(self):
         return self.value_sum / self.visits if self.visits > 0 else 0.0
     
-def expand_node(node, net, board, alpha=None, epsilon=None, device=torch.device('mps')):
-    state = board_to_tensor(board).unsqueeze(0)
-    policy_logits, value = net(state)
-    policy_logits = policy_logits.squeeze(0)
-    value = value.item()
+def expand_node(node, net, board, alpha=None, epsilon=None, policy_logits=None, value=None):
+    if policy_logits is None or value is None:
+        state = board_to_tensor(board).unsqueeze(0)
+        policy_logits, value = net(state)
+        policy_logits = policy_logits.squeeze(0)
+        value = value.item()
 
     mask = torch.tensor(move_mask(board), dtype=torch.float32, device=device)
     masked_logits = policy_logits + (mask - 1) * 1e9
-    priors = F.softmax(masked_logits, dim=0).cpu().detach().numpy()
+    prior = F.softmax(masked_logits, dim=0).cpu().detach().numpy()
 
     if alpha is not None and epsilon is not None:
         legal_idxs = np.where(mask.cpu().numpy() == 1)[0]
         if len(legal_idxs) > 0:
             noise = np.random.dirichlet([alpha] * len(legal_idxs))
-            priors[legal_idxs] = (1 - epsilon) * priors[legal_idxs] + epsilon * noise
+            prior[legal_idxs] = (1 - epsilon) * prior[legal_idxs] + epsilon * noise
 
     for idx in np.where(mask.cpu().numpy() == 1)[0]: # add all children nodes (create child wherever legal move exists)
         move_uci = index_to_move[idx]
         child_board = board.copy()
         child_board.push_uci(move_uci)
-        node.children[idx] = MCTSNode(child_board, parent=node, priors=priors[idx], move_idx=idx)
+        node.children[idx] = MCTSNode(child_board, parent=node, prior=prior[idx], move_idx=idx)
 
     node.is_expanded = True
     node.visits += 1
     node.value_sum += value if board.turn == chess.WHITE else -value
 
     return value if board.turn == chess.WHITE else -value
+
+def batch_expand_nodes(nodes, net, boards, alpha=None, epsilon=None):
+    states = torch.stack([board_to_tensor(board) for board in boards]).to(device)
+    policy_logits, values = net(states)
+    results = []
+    for i, node in enumerate(nodes):
+        board = boards[i]
+        value = expand_node(
+            node,
+            net,
+            board,
+            alpha=alpha,
+            epsilon=epsilon,
+            policy_logits=policy_logits[i],
+            value=values[i].item()
+        )
+        results.append(value)
+    return results
 
 def select_node(root, c_puct):
     node = root
@@ -58,7 +77,7 @@ def select_node(root, c_puct):
 
         for child in node.children.values():
             q = child.average_value()
-            u = c_puct * child.priors * (node.visits ** 0.5) / (1 + child.visits)
+            u = c_puct * child.prior * (node.visits ** 0.5) / (1 + child.visits)
             score = q + u
             if score > best_score:
                 best_score = score
@@ -99,18 +118,28 @@ def visit_policy(root, temperature, device=torch.device('mps')):
     
     return torch.tensor(probs, dtype=torch.float32, device=device)
     
-def search(net, board, n_sims=400, c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
+def search(net, board, n_sims=400, batch_size=32, c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     root = MCTSNode(board)
 
     expand_node(root, net, board, alpha, epsilon)
 
-    for _ in range(n_sims):
-        node = select_node(root, c_puct)
-        if node.board.is_game_over():
-            value = terminal_value(node.board)
-        else:
-            value = expand_node(node, net, node.board)
-        backpropogate(node, value)
+    for _ in range(0, n_sims - 1, batch_size):
+        nodes = []
+        boards = []
+
+        for _ in range(min(batch_size, n_sims - 1 - len(nodes))):
+            node = select_node(root, c_puct)
+            if node.board.is_game_over():
+                value = terminal_value(node.board)
+                backpropogate(node, value)
+            else:
+                nodes.append(node)
+                boards.append(node.board)
+        
+        if nodes:
+            values = batch_expand_nodes(nodes, net, boards, alpha=alpha, epsilon=epsilon)
+            for node, value in zip(nodes, values):
+                backpropogate(node, value)
 
     probs = visit_policy(root, temperature)
 
@@ -124,6 +153,9 @@ def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
 
     while not board.is_game_over():
         probs, value = search(net, board, n_sims, c_puct=c_puct, temperature=temperature, alpha=alpha, epsilon=epsilon)
+        if probs.sum() == 0:
+            print('no valid moves')
+            break
         
         move_idx = torch.multinomial(probs, 1).item()
         move_uci = index_to_move[move_idx]
