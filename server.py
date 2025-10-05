@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/predict": {"origins": "*"}})
 
 n_moves = len(move_to_index)
-model_path = 'eval model.pth'
+model_path = 'modelv1.pth'
 
 model = ChessNet(n_moves)
 model.load_state_dict(torch.load(model_path, map_location=device))
