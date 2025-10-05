@@ -29,11 +29,7 @@ conda create --prefix ./env python=3.11
 conda activate ./env
 pip install -r requirements.txt
 ```
-3. Run the backend (uses port 8080)
-```bash
-python server.py
-```
-4. Open up the HTML page
+3. Open up the HTML page
 ```bash
 # macOS
 open index.html
@@ -43,6 +39,10 @@ start index.html
 
 # Linux
 xdg-open index.html
+```
+4. Run the backend (uses port 8080)
+```bash
+python server.py
 ```
 
 ### Playing the Game
