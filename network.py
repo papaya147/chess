@@ -73,6 +73,7 @@ class ChessNetV1(nn.Module):
 
         p = F.relu(self.policy_conv(x))
         p = p.view(p.size(0), -1)
+        p = self.policy_fc(p)
         p = F.log_softmax(p, dim=1)
 
         v = F.relu(self.value_conv(x))
