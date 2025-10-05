@@ -25,8 +25,8 @@ cd chess-bot
 ```
 2. Install Dependencies:
 ```bash
-conda  create  --prefix  ./env  python=3.11
-conda  activate  ./env
+conda create --prefix ./env python=3.11
+conda activate ./env
 pip install -r requirements.txt
 ```
 3. Run the backend (uses port 8080)
@@ -34,16 +34,14 @@ pip install -r requirements.txt
 python server.py
 ```
 4. Open up the HTML page
-For macOS:
 ```bash
+# macOS
 open index.html
-```
-For Windows:
-```bash
+
+# Windows
 start index.html
-```
-For Linux:
-```bash
+
+# Linux
 xdg-open index.html
 ```
 
