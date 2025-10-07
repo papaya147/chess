@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import torch
 import torch.nn.functional as F
-from network import ChessNetV1 as ChessNet
+from network import ChessNetV2 as ChessNet
 from state import move_to_index, index_to_move, board_to_tensor, move_mask
 import chess
 from device import device
@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/predict": {"origins": "*"}})
 
 n_moves = len(move_to_index)
-model_path = 'modelv1.pth'
+model_path = 'modelv2.pth'
 
 model = ChessNet(n_moves)
 model.load_state_dict(torch.load(model_path, map_location=device))
