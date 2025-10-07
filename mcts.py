@@ -148,7 +148,7 @@ def search(net, board, n_sims=400, batch_size=32, c_puct=1.5, temperature=1.5, a
 
 def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     board = chess.Board()
-    positions, policies, values = [], [], []
+    boards, positions, policies, values = [], [], [], []
 
     while not board.is_game_over():
         probs, value = search(net, board, n_sims, c_puct=c_puct, temperature=temperature, alpha=alpha, epsilon=epsilon)
@@ -161,6 +161,7 @@ def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
         board.push_uci(move_uci)
 
         state = board_to_tensor(board)
+        boards.append(board)
         positions.append(state.cpu())
         policies.append(probs.cpu().numpy())
         values.append(value)
@@ -170,7 +171,7 @@ def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     reward = 1 if result == '1-0' else -1 if result == '0-1' else 0
     values = [reward * (-1 if (len(board.move_stack) - i) % 2 == 1 else 1) for i in range(len(values))]  # flip signs for opponent turns in hindsight
 
-    return board, positions, policies, values
+    return boards, positions, policies, values
 
 def selfplay_wrapper(net_path, num_sims, c_puct, temperature, alpha, epsilon):
     net = ChessNet(n_moves=len(move_to_index))

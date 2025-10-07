@@ -11,12 +11,12 @@ class ReplayBuffer:
         self.pct_recent = pct_recent
         self.pct_recent_util = pct_recent_util
 
-    def add(self, position, policy, value):
-        self.buffer.append((position, policy, value))
+    def add(self, board, position, policy, value):
+        self.buffer.append((board, position, policy, value))
 
-    def add_game(self, positions, policies, values):
-        for pos, pol, val in zip(positions, policies, values):
-            self.add(pos, pol, val)
+    def add_game(self, boards, positions, policies, values):
+        for board, pos, pol, val in zip(boards, positions, policies, values):
+            self.add(board, pos, pol, val)
 
     def sample(self, batch_size):
         if len(self.buffer) < batch_size:
@@ -42,8 +42,9 @@ class ReplayBuffer:
 
             random.shuffle(samples)
         
-        positions, policies, values = zip(*samples)
+        boards, positions, policies, values = zip(*samples)
         return (
+            boards,
             torch.tensor(np.array(positions), dtype=torch.float32, device=device),
             torch.tensor(np.array(policies), dtype=torch.float32, device=device),
             torch.tensor(np.array(values), dtype=torch.float32, device=device)
