@@ -6,6 +6,7 @@ import numpy as np
 import chess
 from network import ChessNetV2 as ChessNet
 from device import device
+import os
 
 class MCTSNode:
     def __init__(self, board, parent=None, prior=0.0, move_idx=None):
@@ -146,7 +147,7 @@ def search(net, board, n_sims=400, batch_size=32, c_puct=1.5, temperature=1.5, a
 
     return probs, value
 
-def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
+def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     board = chess.Board()
     boards, positions, policies, values = [], [], [], []
 
@@ -171,11 +172,14 @@ def selfplay(net, n_sims,c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
     reward = 1 if result == '1-0' else -1 if result == '0-1' else 0
     values = [reward * (-1 if (len(board.move_stack) - i) % 2 == 1 else 1) for i in range(len(values))]  # flip signs for opponent turns in hindsight
 
+    with open(game_save_path, 'w') as file:
+        file.write(', '.join([str(move) for move in board.move_stack]))
+
     return boards, positions, policies, values
 
-def selfplay_wrapper(net_path, num_sims, c_puct, temperature, alpha, epsilon):
+def selfplay_wrapper(net_path, num_sims, game_save_path, c_puct, temperature, alpha, epsilon):
     net = ChessNet(n_moves=len(move_to_index))
     net.load_state_dict(torch.load(net_path))
     net = net.to(device)
     net.eval()
-    return selfplay(net, num_sims, c_puct, temperature, alpha, epsilon)
+    return selfplay(net, num_sims, game_save_path, c_puct, temperature, alpha, epsilon)
