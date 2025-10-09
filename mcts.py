@@ -159,10 +159,12 @@ def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, alpha=0.2
         
         move_idx = torch.multinomial(probs, 1).item()
         move_uci = index_to_move[move_idx]
+
+        boards.append(board.copy())
+        state = board_to_tensor(board)
+
         board.push_uci(move_uci)
 
-        state = board_to_tensor(board)
-        boards.append(board)
         positions.append(state.cpu())
         policies.append(probs.cpu().numpy())
         values.append(value)
@@ -170,12 +172,18 @@ def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, alpha=0.2
     # final reward
     result = board.result()
     reward = 1 if result == '1-0' else -1 if result == '0-1' else 0
-    values = [reward * (-1 if (len(board.move_stack) - i) % 2 == 1 else 1) for i in range(len(values))]  # flip signs for opponent turns in hindsight
+    
+    final_values = []
+    for i in range(len(values)):
+        if i % 2 == 0:  # white's turn
+            final_values.append(reward)
+        else:  # black's turn
+            final_values.append(-reward)
 
     with open(game_save_path, 'w') as file:
         file.write(', '.join([str(move) for move in board.move_stack]))
 
-    return boards, positions, policies, values
+    return boards, positions, policies, final_values
 
 def selfplay_wrapper(net_path, num_sims, game_save_path, c_puct, temperature, alpha, epsilon):
     net = ChessNet(n_moves=len(move_to_index))
