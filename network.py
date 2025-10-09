@@ -42,7 +42,6 @@ class ChessNetV2(nn.Module):
         p = p.view(p.size(0), -1)
         p = self.policy_dropout(p)
         p = self.policy_fc(p)
-        p = F.log_softmax(p, dim=1)
 
         v = F.relu(self.value_conv(x))
         v = v.view(v.size(0), -1)
