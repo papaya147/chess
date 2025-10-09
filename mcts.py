@@ -46,8 +46,6 @@ def expand_node(node, net, board, alpha=None, epsilon=None, policy_logits=None, 
         node.children[idx] = MCTSNode(child_board, parent=node, prior=prior[idx], move_idx=idx)
 
     node.is_expanded = True
-    node.visits += 1
-    node.value_sum += value if board.turn == chess.WHITE else -value
 
     return value if board.turn == chess.WHITE else -value
 
@@ -147,11 +145,14 @@ def search(net, board, n_sims=400, batch_size=32, c_puct=1.5, temperature=1.5, a
 
     return probs, value
 
-def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, alpha=0.2, epsilon=0.2):
+def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, temperature_threshold=15, alpha=0.2, epsilon=0.2):
     board = chess.Board()
     boards, positions, policies, values = [], [], [], []
+    move_count = 0
 
     while not board.is_game_over():
+        current_temp = temperature if move_count < temperature_threshold else 0.1
+
         probs, value = search(net, board, n_sims, c_puct=c_puct, temperature=temperature, alpha=alpha, epsilon=epsilon)
         if probs.sum() == 0:
             print('no valid moves')
@@ -160,34 +161,39 @@ def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, alpha=0.2
         move_idx = torch.multinomial(probs, 1).item()
         move_uci = index_to_move[move_idx]
 
-        boards.append(board.copy())
         state = board_to_tensor(board)
-
-        board.push_uci(move_uci)
-
         positions.append(state.cpu())
+        boards.append(board.copy())
         policies.append(probs.cpu().numpy())
         values.append(value)
+        
+        board.push_uci(move_uci)
+        move_count += 1
     
     # final reward
     result = board.result()
-    reward = 1 if result == '1-0' else -1 if result == '0-1' else 0
+    if result == '1-0':
+        game_reward = 1.0  # White won
+    elif result == '0-1':
+        game_reward = -1.0  # Black won
+    else:
+        game_reward = 0.0  # Draw
     
     final_values = []
     for i in range(len(values)):
         if i % 2 == 0:  # white's turn
-            final_values.append(reward)
+            final_values.append(game_reward)
         else:  # black's turn
-            final_values.append(-reward)
+            final_values.append(-game_reward)
 
     with open(game_save_path, 'w') as file:
         file.write(', '.join([str(move) for move in board.move_stack]))
 
     return boards, positions, policies, final_values
 
-def selfplay_wrapper(net_path, num_sims, game_save_path, c_puct, temperature, alpha, epsilon):
+def selfplay_wrapper(net_path, num_sims, game_save_path, c_puct, temperature, temperature_threshold, alpha, epsilon):
     net = ChessNet(n_moves=len(move_to_index))
     net.load_state_dict(torch.load(net_path))
     net = net.to(device)
     net.eval()
-    return selfplay(net, num_sims, game_save_path, c_puct, temperature, alpha, epsilon)
+    return selfplay(net, num_sims, game_save_path, c_puct, temperature, temperature_threshold, alpha, epsilon)
