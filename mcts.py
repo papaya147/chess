@@ -153,7 +153,7 @@ def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, temperatu
     while not board.is_game_over():
         current_temp = temperature if move_count < temperature_threshold else 0.1
 
-        probs, value = search(net, board, n_sims, c_puct=c_puct, temperature=temperature, alpha=alpha, epsilon=epsilon)
+        probs, value = search(net, board, n_sims, c_puct=c_puct, temperature=current_temp, alpha=alpha, epsilon=epsilon)
         if probs.sum() == 0:
             print('no valid moves')
             break
@@ -170,21 +170,19 @@ def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, temperatu
         board.push_uci(move_uci)
         move_count += 1
     
-    # final reward
     result = board.result()
     if result == '1-0':
-        game_reward = 1.0  # White won
+        game_reward = 1.0
     elif result == '0-1':
-        game_reward = -1.0  # Black won
+        game_reward = -1.0
     else:
-        game_reward = 0.0  # Draw
+        game_reward = 0.0
     
     final_values = []
-    for i in range(len(values)):
-        if i % 2 == 0:  # white's turn
-            final_values.append(game_reward)
-        else:  # black's turn
-            final_values.append(-game_reward)
+    for i, mcts_value in enumerate(values):
+        turn_reward = game_reward if i % 2 == 0 else -game_reward
+        blended_value = 0.6 * turn_reward + 0.4 * mcts_value
+        final_values.append(blended_value)
 
     with open(game_save_path, 'w') as file:
         file.write(', '.join([str(move) for move in board.move_stack]))
