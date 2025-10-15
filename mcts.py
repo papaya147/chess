@@ -135,7 +135,7 @@ def search(net, board, n_sims=400, batch_size=32, c_puct=1.5, temperature=1.5, a
                 boards.append(node.board)
         
         if nodes:
-            values = batch_expand_nodes(nodes, net, boards, alpha=alpha, epsilon=epsilon)
+            values = batch_expand_nodes(nodes, net, boards, alpha=None, epsilon=None)
             for node, value in zip(nodes, values):
                 backpropogate(node, value)
 
@@ -179,10 +179,9 @@ def selfplay(net, n_sims, game_save_path, c_puct=1.5, temperature=1.5, temperatu
         game_reward = 0.0
     
     final_values = []
-    for i, mcts_value in enumerate(values):
+    for i in range(len(positions)):
         turn_reward = game_reward if i % 2 == 0 else -game_reward
-        blended_value = 0.6 * turn_reward + 0.4 * mcts_value
-        final_values.append(blended_value)
+        final_values.append(turn_reward)
 
     with open(game_save_path, 'w') as file:
         file.write(', '.join([str(move) for move in board.move_stack]))
