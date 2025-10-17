@@ -4,3 +4,4 @@
 **/model.pth
 **/optimizer.pth
 **/replay-buffer.pkl
+**/games
